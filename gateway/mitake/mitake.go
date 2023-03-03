@@ -1,29 +1,30 @@
 package mitake
 
 import (
-	"github.com/davecgh/go-spew/spew"
+	"fmt"
 	"github.com/go-packagist/sms/gateway"
-	"github.com/go-packagist/sms/support/utils"
+	"golang.org/x/text/encoding/traditionalchinese"
+	"net/url"
 )
 
-const ApiUri = "https://smsapi.mitake.com.tw"
-const ApiSmsUrl = "/api/mtk/SmSend"
-
 type Config struct {
+	ApiUrl   string
 	Username string
 	Password string
 }
 
 // MiTake 三竹短信
-// @see https://sms.mitake.com.tw/common/index.jsp?t=1673245880983#
+// @see https://sms.mitake.com.tw/
 type MiTake struct {
 	*gateway.Base
 
 	config *Config
 }
 
-var _ gateway.Config = (*Config)(nil)
-var _ gateway.Gateway = (*MiTake)(nil)
+var (
+	_ gateway.Config  = (*Config)(nil)
+	_ gateway.Gateway = (*MiTake)(nil)
+)
 
 // New a new MiTake gateway
 func New(config *Config) gateway.Gateway {
@@ -34,33 +35,31 @@ func New(config *Config) gateway.Gateway {
 }
 
 // Send a message
-func (m *MiTake) Send(phone, message interface{}) error {
+func (m *MiTake) Send(phone, message interface{}) (*gateway.Response, error) {
+	// parse phone and message
 	ph, msg, err := m.Parse(phone, message)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	body, err := utils.Utf8ToBig5([]byte(msg.Content))
-
-	params := map[string]string{
-		"CharsetURL": "UTF8",
-		"username":   m.config.Username,
-		"password":   m.config.Password,
-		"dstaddr":    ph.GetPhoneNumber(),
-		"smbody":     string(body),
-		"type":       "now",
+	// convert to big5
+	smbody, err := traditionalchinese.Big5.NewEncoder().String(msg.Content)
+	if err != nil {
+		return nil, err
 	}
 
-	response, err := m.Http().R().
-		EnableTrace().
-		SetQueryParams(params).
-		Get(ApiUri + ApiSmsUrl)
-	// // response, err := m.Http().R().SetQueryParams(params).Get(ApiUri + ApiSmsUrl)
-	// // responseBody, _ := utils.Big5ToUtf8(response.Body())
-	spew.Dump(ApiUri+ApiSmsUrl, response.Request.TraceInfo(), response.String(), err)
-	// if err != nil {
-	// 	return err
-	// }
+	// send request
+	resp, err := m.Http().R().
+		// EnableTrace().
+		Get(m.config.ApiUrl + "?" +
+			fmt.Sprintf("username=%s&password=%s&type=now&encoding=big5&dstaddr=%s&smbody=%s",
+				m.config.Username, m.config.Password, ph.GetPhoneNumber(), url.PathEscape(smbody))) // fix: use `url.PathEscape` fix to url encode about `space`
 
-	return nil
+	if err != nil {
+		return nil, err
+	}
+
+	// spew.Dump(resp.Request.TraceInfo(), resp.Body(), err)
+
+	return gateway.NewResponse(resp), nil
 }

@@ -2,7 +2,9 @@ package log
 
 import (
 	"github.com/go-packagist/sms/gateway"
+	"github.com/go-resty/resty/v2"
 	_log "log"
+	"net/http"
 )
 
 type Config struct{}
@@ -13,8 +15,10 @@ type Log struct {
 	config *Config
 }
 
-var _ gateway.Config = (*Config)(nil)
-var _ gateway.Gateway = (*Log)(nil)
+var (
+	_ gateway.Config  = (*Config)(nil)
+	_ gateway.Gateway = (*Log)(nil)
+)
 
 func New(config *Config) gateway.Gateway {
 	return &Log{
@@ -22,15 +26,21 @@ func New(config *Config) gateway.Gateway {
 	}
 }
 
-func (l *Log) Send(phone, message interface{}) error {
+func (l *Log) Send(phone, message interface{}) (*gateway.Response, error) {
 	ph, msg, err := l.Parse(phone, message)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_log.Printf("%s %s",
-		ph.GetFullNumber(), msg.GetContent(),
-	)
+	_log.Printf("%s %s", ph.GetFullNumber(), msg.GetContent())
 
-	return nil
+	return gateway.NewResponse(&resty.Response{
+		Request: &resty.Request{},
+		RawResponse: &http.Response{
+			StatusCode: http.StatusOK,
+			Status:     http.StatusText(http.StatusOK),
+			Proto:      "HTTP/1.1",
+			Body:       http.NoBody,
+		},
+	}), nil
 }

@@ -7,7 +7,7 @@ import (
 )
 
 type Gateway interface {
-	Send(interface{}, interface{}) error
+	Send(interface{}, interface{}) (*Response, error)
 }
 
 type Config interface {
