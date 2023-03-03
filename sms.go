@@ -25,7 +25,7 @@ func New(cfg *Config) *Sms {
 
 // Send a sms.
 // Example: example/sms/sms.go
-func (s *Sms) Send(phone, message interface{}) error {
+func (s *Sms) Send(phone, message interface{}) (*gateway.Response, error) {
 	return s.Gateway().Send(phone, message)
 }
 
